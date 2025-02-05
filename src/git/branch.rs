@@ -31,13 +31,11 @@ impl BranchManager {
     }
 
     fn fetch_from_remote(&self) -> Result<(), git2::Error> {
-        if let Ok(remote) = self.repo.find_remote("origin") {
-            // 配置 fetch 选项
+        if let Ok(mut remote) = self.repo.find_remote("origin") {
             let mut fetch_options = git2::FetchOptions::new();
             fetch_options.download_tags(git2::AutotagOption::None);
             fetch_options.update_fetchhead(true);
 
-            // 执行 fetch
             remote.fetch(&[] as &[&str], Some(&mut fetch_options), None)?;
         }
         Ok(())
@@ -55,7 +53,6 @@ impl BranchManager {
             for branch_result in branch_iter {
                 if let Ok((branch, _)) = branch_result {
                     if let Ok(Some(name)) = branch.name() {
-                        // Skip protected and current branches
                         if self.protected_branches.contains(&name.to_string()) ||
                            Some(name.to_string()) == current {
                             continue;
