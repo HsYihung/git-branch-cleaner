@@ -1,6 +1,7 @@
 use git2::{BranchType, Repository};
 use chrono::{DateTime, TimeZone, Utc};
 use std::path::Path;
+use std::process::Command;
 
 #[derive(Debug)]
 pub struct GitBranch {
@@ -53,8 +54,8 @@ impl BranchManager {
             for branch_result in branch_iter {
                 if let Ok((branch, _)) = branch_result {
                     if let Ok(Some(name)) = branch.name() {
-                        if self.protected_branches.contains(&name.to_string()) ||
-                           Some(name.to_string()) == current {
+                        // Skip protected branches only, show current branch
+                        if self.protected_branches.contains(&name.to_string()) {
                             continue;
                         }
 
@@ -78,22 +79,16 @@ impl BranchManager {
     }
 
     fn is_branch_merged(&self, branch_name: &str) -> bool {
-        if let Ok(head) = self.repo.head() {
-            if let Ok(head_commit) = head.peel_to_commit() {
-                if let Ok(branch_ref) = self.repo.find_branch(branch_name, BranchType::Local) {
-                    if let Ok(branch_commit) = branch_ref.get().peel_to_commit() {
-                        if self.repo.graph_descendant_of(head_commit.id(), branch_commit.id()).unwrap_or(false) {
-                            return true;
-                        }
-                        
-                        if let Ok(merge_base) = self.repo.merge_base(head_commit.id(), branch_commit.id()) {
-                            return merge_base == branch_commit.id();
-                        }
-                    }
-                }
-            }
+        // 使用 git 命令来检查分支是否已合并
+        let output = Command::new("git")
+            .args(&["merge-base", "--is-ancestor", branch_name, "HEAD"])
+            .current_dir(self.repo.path().parent().unwrap_or(self.repo.path()))
+            .status();
+
+        match output {
+            Ok(status) => status.success(),
+            Err(_) => false,
         }
-        false
     }
 
     fn is_protected(&self, branch_name: &str) -> bool {
