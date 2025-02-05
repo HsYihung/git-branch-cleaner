@@ -82,7 +82,13 @@ impl BranchManager {
             if let Ok(head_commit) = head.peel_to_commit() {
                 if let Ok(branch_ref) = self.repo.find_branch(branch_name, BranchType::Local) {
                     if let Ok(branch_commit) = branch_ref.get().peel_to_commit() {
-                        return self.repo.graph_descendant_of(head_commit.id(), branch_commit.id()).unwrap_or(false);
+                        if self.repo.graph_descendant_of(head_commit.id(), branch_commit.id()).unwrap_or(false) {
+                            return true;
+                        }
+                        
+                        if let Ok(merge_base) = self.repo.merge_base(head_commit.id(), branch_commit.id()) {
+                            return merge_base == branch_commit.id();
+                        }
                     }
                 }
             }
