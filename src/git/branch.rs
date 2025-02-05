@@ -42,19 +42,42 @@ impl BranchManager {
         Ok(())
     }
 
+    fn get_merged_branches(&self) -> Vec<String> {
+        let output = Command::new("git")
+            .args(&["branch", "--merged"])
+            .current_dir(self.repo.path().parent().unwrap_or(self.repo.path()))
+            .output();
+
+        match output {
+            Ok(output) => {
+                String::from_utf8_lossy(&output.stdout)
+                    .lines()
+                    .filter_map(|line| {
+                        let branch = line.trim().trim_start_matches('*').trim();
+                        if !branch.is_empty() {
+                            Some(branch.to_string())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            }
+            Err(_) => Vec::new(),
+        }
+    }
+
     pub fn list_branches(&self) -> Vec<GitBranch> {
         if let Err(e) = self.fetch_from_remote() {
             eprintln!("Warning: Failed to fetch from remote: {}", e);
         }
 
-        let current = self.get_current_branch();
+        let merged_branches = self.get_merged_branches();
         let mut branches = Vec::new();
 
         if let Ok(branch_iter) = self.repo.branches(Some(BranchType::Local)) {
             for branch_result in branch_iter {
                 if let Ok((branch, _)) = branch_result {
                     if let Ok(Some(name)) = branch.name() {
-                        // Skip protected branches only, show current branch
                         if self.protected_branches.contains(&name.to_string()) {
                             continue;
                         }
@@ -62,7 +85,7 @@ impl BranchManager {
                         if let Ok(commit) = branch.get().peel_to_commit() {
                             let timestamp = commit.time().seconds();
                             if let Some(date) = Utc.timestamp_opt(timestamp, 0).earliest() {
-                                let is_merged = self.is_branch_merged(&name);
+                                let is_merged = merged_branches.contains(&name.to_string());
                                 branches.push(GitBranch {
                                     name: name.to_string(),
                                     last_commit_date: date,
@@ -76,19 +99,6 @@ impl BranchManager {
         }
 
         branches
-    }
-
-    fn is_branch_merged(&self, branch_name: &str) -> bool {
-        // 使用 git 命令来检查分支是否已合并
-        let output = Command::new("git")
-            .args(&["merge-base", "--is-ancestor", branch_name, "HEAD"])
-            .current_dir(self.repo.path().parent().unwrap_or(self.repo.path()))
-            .status();
-
-        match output {
-            Ok(status) => status.success(),
-            Err(_) => false,
-        }
     }
 
     fn is_protected(&self, branch_name: &str) -> bool {
