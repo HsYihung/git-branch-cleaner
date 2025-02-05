@@ -2,6 +2,7 @@ use git2::{BranchType, Repository};
 use chrono::{DateTime, TimeZone, Utc};
 use std::path::Path;
 use std::process::Command;
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct GitBranch {
@@ -42,28 +43,46 @@ impl BranchManager {
         Ok(())
     }
 
-    fn get_merged_branches(&self) -> Vec<String> {
-        let output = Command::new("git")
+    fn get_merged_branches(&self) -> HashSet<String> {
+        let mut merged_branches = HashSet::new();
+        
+        // 检查通过 merge 合并的分支
+        if let Ok(output) = Command::new("git")
             .args(&["branch", "--merged"])
             .current_dir(self.repo.path().parent().unwrap_or(self.repo.path()))
-            .output();
-
-        match output {
-            Ok(output) => {
-                String::from_utf8_lossy(&output.stdout)
-                    .lines()
-                    .filter_map(|line| {
-                        let branch = line.trim().trim_start_matches('*').trim();
-                        if !branch.is_empty() {
-                            Some(branch.to_string())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            }
-            Err(_) => Vec::new(),
+            .output() {
+            String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .filter_map(|line| {
+                    let branch = line.trim().trim_start_matches('*').trim();
+                    if !branch.is_empty() {
+                        Some(branch.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .for_each(|branch| { merged_branches.insert(branch); });
         }
+
+        // 检查通过 rebase 合并的分支
+        if let Ok(output) = Command::new("git")
+            .args(&["for-each-ref", "--format=%(refname:short)", "refs/heads/"])
+            .current_dir(self.repo.path().parent().unwrap_or(self.repo.path()))
+            .output() {
+            let branches = String::from_utf8_lossy(&output.stdout);
+            for branch in branches.lines() {
+                if let Ok(status) = Command::new("git")
+                    .args(&["merge-base", "--is-ancestor", branch, "HEAD"])
+                    .current_dir(self.repo.path().parent().unwrap_or(self.repo.path()))
+                    .status() {
+                    if status.success() {
+                        merged_branches.insert(branch.to_string());
+                    }
+                }
+            }
+        }
+
+        merged_branches
     }
 
     pub fn list_branches(&self) -> Vec<GitBranch> {
