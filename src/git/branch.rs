@@ -30,7 +30,24 @@ impl BranchManager {
             .map(String::from)
     }
 
+    fn fetch_from_remote(&self) -> Result<(), git2::Error> {
+        if let Ok(remote) = self.repo.find_remote("origin") {
+            // 配置 fetch 选项
+            let mut fetch_options = git2::FetchOptions::new();
+            fetch_options.download_tags(git2::AutotagOption::None);
+            fetch_options.update_fetchhead(true);
+
+            // 执行 fetch
+            remote.fetch(&[] as &[&str], Some(&mut fetch_options), None)?;
+        }
+        Ok(())
+    }
+
     pub fn list_branches(&self) -> Vec<GitBranch> {
+        if let Err(e) = self.fetch_from_remote() {
+            eprintln!("Warning: Failed to fetch from remote: {}", e);
+        }
+
         let current = self.get_current_branch();
         let mut branches = Vec::new();
 
