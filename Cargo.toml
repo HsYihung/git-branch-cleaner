@@ -10,7 +10,7 @@ description = "A cross-platform CLI tool for cleaning Git branches"
 [dependencies]
 clap = { version = "4.4", features = ["derive"] }
 colored = "2.1"
-git2 = "0.18"
+git2 = { version = "0.18", default-features = false, features = ["vendored-libgit2"] }
 chrono = "0.4"
 walkdir = "2.4"
 dialoguer = "0.11"

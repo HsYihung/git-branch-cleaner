@@ -44,6 +44,29 @@ cargo install --path .
    - 選擇要執行的清理操作
    - 確認要刪除的分支
 
+## Building from Source
+
+### Prerequisites
+
+- Docker Desktop
+
+### Building with Docker
+
+使用 Docker 进行跨平台构建，支持 Windows 和 macOS：
+
+```bash
+# 构建 Docker 镜像
+docker build -t git-branch-cleaner-builder .
+
+# 运行构建容器
+docker run --rm -v ${PWD}:/usr/src/git-branch-cleaner git-branch-cleaner-builder "0.1.0"
+```
+
+构建完成后，可执行文件将在 `release` 目录中：
+- Windows: `git-branch-cleaner-v0.1.0-windows-x64.exe`
+- macOS x64: `git-branch-cleaner-v0.1.0-macos-x64`
+- macOS ARM: `git-branch-cleaner-v0.1.0-macos-arm64`
+
 ## 注意事項
 
 - 受保護分支（main、master、dev、develop）不會被刪除
